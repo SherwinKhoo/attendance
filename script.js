@@ -79,6 +79,10 @@ tableOfIds.id = "table-of-ids";
 const buttonPurgeData = document.createElement("button");
 buttonPurgeData.id = "button-purge-data";
 
+// 2.7 Export as XML
+const buttonExportData = document.createElement("button");
+buttonExportData.id = "button-export-data";
+
 ///////////////////////////////////
 ///// MARK: APPEND
 ///////////////////////////////////
@@ -102,7 +106,8 @@ qrCodeScanner.append(
   cameraFeedStatement,
   cameraFeedButtonContainer,
   tableOfIds,
-  buttonPurgeData
+  buttonPurgeData,
+  buttonExportData
 );
 
 cameraFeedButtonContainer.append(
@@ -148,6 +153,8 @@ buttonCameraFeedScan.disabled = true;
 
 buttonPurgeData.innerText = "Clear data";
 
+buttonExportData.innerText = "Export Data";
+
 let countdownInterval = null;
 
 let isCameraActive = false;
@@ -188,6 +195,7 @@ buttonRefreshQRCode.addEventListener("click", handleQRCodeRefreshClick);
 buttonCameraFeedStartStop.addEventListener("click", toggleCamera);
 buttonCameraFeedScan.addEventListener("click", handleScan);
 buttonPurgeData.addEventListener("click", handlePurgeData);
+buttonExportData.addEventListener("click", exportToXML);
 
 ///////////////////////////////////
 ///// MARK: Geolocation
@@ -617,3 +625,83 @@ inputId.addEventListener("input", () => {
     updateTableOfIds(scannerId);
   }
 });
+
+///////////////////////////////////
+///// MARK: XML Export
+///////////////////////////////////
+
+function exportToXML() {
+  const scannerId = inputId.value.trim();
+
+  // Validate scanner ID
+  if (!CONFIG.USER_ID_REGEX.test(scannerId)) {
+    alert("Invalid scanner ID");
+    return;
+  }
+
+  // Get data from localStorage
+  const data = JSON.parse(localStorage.getItem(scannerId));
+  if (!data || data.length === 0) {
+    alert("No data to export");
+    return;
+  }
+
+  // Create XML structure
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<ScanData>
+  <ScannerID>${scannerId}</ScannerID>
+  <Entries>`;
+
+  data.forEach((entry) => {
+    xml += `
+    <Entry>
+      <ID>${escapeXML(entry.id)}</ID>
+      <Attempts>`;
+
+    entry.attempts.forEach((attempt) => {
+      xml += `
+        <Attempt>
+          <Status>${escapeXML(attempt[0])}</Status>
+          <Timestamp>${escapeXML(attempt[1])}</Timestamp>
+          <Coordinates>
+            <Latitude>${attempt[2][0]}</Latitude>
+            <Longitude>${attempt[2][1]}</Longitude>
+          </Coordinates>
+        </Attempt>`;
+    });
+
+    xml += `
+      </Attempts>
+    </Entry>`;
+  });
+
+  xml += `
+  </Entries>
+</ScanData>`;
+
+  // Create downloadable file
+  const blob = new Blob([xml], { type: "application/xml" });
+  const url = URL.createObjectURL(blob);
+
+  // Create temporary link
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${scannerId}.xml`;
+  document.body.appendChild(a);
+  a.click();
+
+  // Cleanup
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+function escapeXML(str) {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
