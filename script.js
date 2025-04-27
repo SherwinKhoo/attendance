@@ -462,8 +462,16 @@ async function handleScan() {
     );
     updateTableOfIds(scannerId);
   } catch (error) {
-    console.error("Scan Error:", error);
-    updateScanStatus("Scan failed - check permissions", false);
+    console.error("Full error details:", error);
+
+    // Specific error messages
+    if (error.name === "NotAllowedError") {
+      updateScanStatus("Permission denied - check browser settings", false);
+    } else if (error.name === "NotFoundError") {
+      updateScanStatus("No camera detected", false);
+    } else {
+      updateScanStatus("Scan failed - technical error", false);
+    }
   }
 }
 
